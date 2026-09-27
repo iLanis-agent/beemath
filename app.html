@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BeeMath - honest backyard bee math</title>
+<style>
+  :root { --bg:#161310; --card:#221c12; --line:#403420; --ink:#f2ead8; --dim:#b3a482; --gold:#f0b429; --warn:#e07a4a; --ok:#8fbf6a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:920px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { font-size:30px; margin:6px 0 0; } h1 span { color:var(--gold); }
+  nav { text-align:right; } nav a { color:var(--dim); text-decoration:none; font-size:14px; }
+  nav a:hover { color:var(--gold); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-top:22px; }
+  .card h2 { margin:0 0 14px; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+  label { display:block; font-size:12px; color:var(--dim); margin-bottom:4px; }
+  input, select { background:#191510; border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:9px 10px; font-size:15px; width:110px; }
+  select { width:auto; min-width:150px; }
+  .presets { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+  .presets button { background:#2c2416; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:14px; cursor:pointer; }
+  .presets button:hover { border-color:var(--gold); }
+  .stat { display:inline-block; background:#191510; border:1px solid var(--line); border-radius:10px; padding:12px 18px; margin:0 10px 10px 0; min-width:130px; }
+  .stat b { display:block; font-size:24px; color:var(--gold); }
+  .stat small { color:var(--dim); font-size:12px; }
+  .verdict { font-size:17px; margin:2px 0 14px; }
+  .verdict b { color:var(--gold); }
+  .fix { background:#2c2110; border:1px solid #4f3d1c; border-radius:10px; padding:12px 16px; margin-top:8px; font-size:15px; }
+  .fix.ok { background:#1c2415; border-color:#3a4a28; }
+  .fix.warn { background:#2c1410; border-color:#5c2b20; }
+  .note { color:var(--dim); font-size:13px; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><a href="index.html">about</a></nav>
+  <h1>Bee<span>Math</span></h1>
+  <div class="note" style="font-size:14px;">Syrup is weighed, mites are counted, and winter is a number, not a hope.</div>
+
+  <div class="card">
+    <h2>The apiary</h2>
+    <div class="row">
+      <div><label>Hives</label><input id="hives" type="number" min="1" max="50" step="1" value="2"></div>
+      <div><label>Climate</label><select id="climate"><option value="mild">Mild winter</option><option value="moderate" selected>Moderate winter</option><option value="cold">Cold winter</option></select></div>
+      <div><label>Stores on each hive (lb)</label><input id="stores" type="number" min="0" max="120" step="5" value="50"></div>
+    </div>
+    <div class="presets" id="presets"></div>
+    <div id="winter"></div>
+  </div>
+
+  <div class="card">
+    <h2>The syrup</h2>
+    <div class="row">
+      <div><label>Water (gal)</label><input id="water" type="number" min="0.5" max="10" step="0.5" value="1"></div>
+      <div><label>Mix</label><select id="ratio"><option value="1:1">1:1 - spring build-up</option><option value="2:1" selected>2:1 - fall feeding</option></select></div>
+    </div>
+    <div id="syrup"></div>
+  </div>
+
+  <div class="card">
+    <h2>The mites</h2>
+    <div class="row">
+      <div><label>Mites in wash</label><input id="mites" type="number" min="0" max="100" step="1" value="9"></div>
+      <div><label>Bees sampled</label><input id="bees" type="number" min="100" max="600" step="50" value="300"></div>
+    </div>
+    <div id="mite"></div>
+  </div>
+
+  <div class="card">
+    <h2>The harvest</h2>
+    <div class="row">
+      <div><label>Flow strength</label><select id="flow"><option value="strong" selected>Strong flow</option><option value="moderate">Moderate flow</option><option value="dearth">Dearth</option></select></div>
+      <div><label>Capped frames (deep)</label><input id="frames" type="number" min="0" max="40" step="1" value="10"></div>
+    </div>
+    <div id="harvest"></div>
+  </div>
+</div>
+<script src="engine.js"></script>
+<script>
+var $ = function(id){ return document.getElementById(id); };
+var PRESETS = {
+  'First hive, moderate': { hives:1, climate:'moderate', stores:60 },
+  'Two hives, cold': { hives:2, climate:'cold', stores:70 },
+  'Four hives, mild': { hives:4, climate:'mild', stores:65 },
+  'New package, cold': { hives:1, climate:'cold', stores:30 }
+};
+var pb = $('presets');
+Object.keys(PRESETS).forEach(function(name){
+  var b = document.createElement('button'); b.textContent = name;
+  b.onclick = function(){ var p = PRESETS[name];
+    $('hives').value = p.hives; $('climate').value = p.climate; $('stores').value = p.stores; render(); };
+  pb.appendChild(b);
+});
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function render(){
+  var hives = parseInt($('hives').value), climate = $('climate').value, stores = parseFloat($('stores').value);
+  if (!(hives > 0)) { $('winter').innerHTML = '<div class="note">Enter hive count.</div>'; } else {
+    var need = BeeEngine.winterStoresLbs(climate);
+    var verdict = BeeEngine.storesVerdict(stores, climate);
+    var short = /short/.test(verdict);
+    var harvest = BeeEngine.honeyForHives(hives);
+    $('winter').innerHTML =
+      '<div class="verdict">' + hives + ' hive' + (hives > 1 ? 's' : '') + ' in a ' + climate + ' winter needs <b>' + need * hives + ' lb</b> of honey across the yard (' + need + ' each).</div>' +
+      '<span class="stat"><b>' + need + ' lb</b><small>winter stores per hive</small></span>' +
+      '<span class="stat"><b>' + harvest + ' lb</b><small>fair-year harvest, ' + hives + ' hive' + (hives > 1 ? 's' : '') + '</small></span>' +
+      '<span class="stat"><b>' + BeeEngine.population(1500, 42).toLocaleString() + '</b><small>summer bees per strong hive</small></span>' +
+      '<div class="fix' + (short ? ' warn' : ' ok') + '">' + esc(verdict) + '</div>' +
+      '<div class="note">The 60 lb-per-hive harvest figure is a fair-year average, not a promise: first-year packages often give you nothing, and that is normal. A strong queen laying 1,500 a day against a 42-day lifespan holds about 63,000 workers - most of what you see is three weeks old.</div>';
+  }
+
+  var water = parseFloat($('water').value), ratio = $('ratio').value;
+  if (water > 0) {
+    var sugar = BeeEngine.syrupSugarLbs(water, ratio);
+    var total = BeeEngine.syrupTotalGal(water, ratio);
+    $('syrup').innerHTML =
+      '<div class="verdict">' + water + ' gal of water at ' + ratio + ' takes <b>' + sugar + ' lb of sugar</b> and makes about <b>' + total + ' gal</b> of syrup.</div>' +
+      '<span class="stat"><b>' + sugar + ' lb</b><small>sugar to weigh out</small></span>' +
+      '<span class="stat"><b>' + total + ' gal</b><small>syrup you end up with</small></span>' +
+      '<div class="note">Ratios are by WEIGHT, not volume - a gallon of water is 8.34 lb, so 2:1 means 16.7 lb of sugar per gallon of water. 1:1 in spring to stimulate, 2:1 in fall to pack stores. Never feed during a honey flow you intend to harvest, and never feed with supers on.</div>';
+  } else { $('syrup').innerHTML = '<div class="note">Enter water volume.</div>'; }
+
+  var mites = parseInt($('mites').value) || 0, bees = parseInt($('bees').value) || 300;
+  var pct = BeeEngine.varroaPct(mites, bees);
+  var mv = BeeEngine.varroaVerdict(mites, bees);
+  var bad = /treat now/.test(mv), border = /borderline/.test(mv);
+  $('mite').innerHTML =
+    '<div class="verdict">' + mites + ' mites on ' + bees + ' bees is <b>' + pct + '%</b>.</div>' +
+    '<div class="fix' + (bad ? ' warn' : border ? '' : ' ok') + '">' + esc(mv) + '</div>' +
+    '<div class="note">An alcohol wash over about 300 bees (half a cup) is the only count that matters. Under 2% you monitor, 2-3% you argue about timing, over 3% the arguing is over. Guessing from "the hive looks strong" is how colonies die in November.</div>';
+
+  var flow = $('flow').value, frames = parseInt($('frames').value) || 0;
+  var weeks = BeeEngine.superWeeks(flow);
+  var lbs = frames * BeeEngine.frameHoneyLb('deep');
+  $('harvest').innerHTML =
+    '<div class="verdict">' + frames + ' capped deep frames is <b>' + lbs + ' lb of honey</b>; a super fills in <b>' + weeks.min + '-' + weeks.max + ' weeks</b> on this flow.</div>' +
+    '<span class="stat"><b>' + lbs + ' lb</b><small>' + frames + ' deep frames capped</small></span>' +
+    '<span class="stat"><b>' + weeks.min + '-' + weeks.max + ' wk</b><small>to fill a super, ' + flow + ' flow</small></span>' +
+    (weeks.note ? '<div class="fix warn">' + esc(weeks.note) + '</div>' : '') +
+    '<div class="note">A capped deep frame runs about 7 lb (5 for mediums). Harvest only what is capped - uncapped nectar is over 17% water and ferments in the jar.</div>';
+}
+['hives','climate','stores','water','ratio','mites','bees','flow','frames'].forEach(function(id){ $(id).addEventListener('input', render); });
+render();
+</script>
+</body>
+</html>
